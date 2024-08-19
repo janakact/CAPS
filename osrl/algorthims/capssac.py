@@ -375,7 +375,7 @@ class CapsSACTrainer:
         return agent_performance
     
 
-    def evaluate_head_switch(self, cost_limit, eval_episodes):
+    def evaluate_switch(self, cost_limit, eval_episodes):
         """
         Evaluates the performance of the model on a number of episodes.
         """

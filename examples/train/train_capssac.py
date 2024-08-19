@@ -1,10 +1,13 @@
 import os
+import uuid
 import types
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
+from typing import Any, DefaultDict, Dict, List, Optional, Tuple
 import sys
 parentdir = "/home/../OSRL/" 
 sys.path.insert(0, parentdir)
 
+import numpy as np
 import pyrallis
 import torch
 from dsrl.infos import DENSITY_CFG
@@ -12,23 +15,24 @@ from dsrl.offline_env import OfflineEnvWrapper, wrap_env  # noqa
 from fsrl.utils import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm.auto import trange  # noqa
-from examples.configs.capsiql_configs import CapsIQL_DEFAULT_CONFIG, CapsIQLTrainConfig
-from osrl.algorithms import CapsIQL, CapsIQLTrainer
+
+from examples.configs.caps_configs import CapsSAC_DEFAULT_CONFIG, CapsSACTrainConfig
+from osrl.algorithms import CapsSAC, CapsSACTrainer
 from osrl.common import TransitionDataset
 from osrl.common.exp_util import auto_name, seed_all
 
 
 @pyrallis.wrap()
-def train(args: CapsIQLTrainConfig):
+def train(args: CapsSACTrainConfig):
     # update config
-    cfg, old_cfg = asdict(args), asdict(CapsIQLTrainConfig())
+    cfg, old_cfg = asdict(args), asdict(CapsSACTrainConfig())
     differing_values = {key: cfg[key] for key in cfg.keys() if cfg[key] != old_cfg[key]}
-    cfg = asdict(CapsIQL_DEFAULT_CONFIG[args.task]())
+    cfg = asdict(CapsSAC_DEFAULT_CONFIG[args.task]())
     cfg.update(differing_values)
     args = types.SimpleNamespace(**cfg)
-
+    
     # setup logger
-    default_cfg = asdict(CapsIQL_DEFAULT_CONFIG[args.task]())
+    default_cfg = asdict(CapsSAC_DEFAULT_CONFIG[args.task]())
     if args.name is None:
         args.name = auto_name(default_cfg, cfg, args.prefix, args.suffix)
     if args.group is None:
@@ -36,7 +40,6 @@ def train(args: CapsIQLTrainConfig):
     if args.logdir is not None:
         args.logdir += f"_{args.num_heads}"
         args.logdir = os.path.join(args.logdir, args.group, args.name)
-    
     logger = WandbLogger(cfg, args.project, args.group, args.name, args.logdir)
     logger.save_config(cfg, verbose=args.verbose)
 
@@ -79,6 +82,8 @@ def train(args: CapsIQLTrainConfig):
                                 max_npb=max_npb,
                                 min_npb=min_npb)
 
+    args.scalarization_step = data["rewards"].max() * args.reward_scale
+
     # wrapper
     env = wrap_env(
         env=env,
@@ -86,19 +91,26 @@ def train(args: CapsIQLTrainConfig):
     )
     env = OfflineEnvWrapper(env)
 
-    model = CapsIQL(
+    # model & optimizer setup
+    model = CapsSAC(
         state_dim=env.observation_space.shape[0],
         action_dim=env.action_space.shape[0],
         max_action=env.action_space.high[0],
-        num_heads=args.num_heads,
-        iql_deterministic=args.iql_deterministic,
-        hidden_dim=args.hidden_dim,
-        iql_tau=args.iql_tau,
-        iql_tau_cost=args.iql_tau_cost,
-        beta=args.beta,
-        beta_cost=args.beta_cost,
-        tau=args.tau,
+        a_hidden_sizes=args.a_hidden_sizes,
+        c_hidden_sizes=args.c_hidden_sizes,
+        sample_action_num=args.sample_action_num,
+        init_temperature=args.init_temperature,
+        alphas_betas=args.alphas_betas,
+        actor_betas=args.alphas_betas,
+        critic_betas=args.alphas_betas,        
+        learnable_temperature=args.learnable_temperature,
         gamma=args.gamma,
+        tau=args.tau,
+        beta=args.beta,
+        num_heads=args.num_heads,
+        num_q=args.num_q,
+        num_qc=args.num_qc,
+        scalarization_step=args.scalarization_step,
         episode_len=args.episode_len,
         device=args.device,
     )
@@ -110,13 +122,12 @@ def train(args: CapsIQLTrainConfig):
     
     logger.setup_checkpoint_fn(checkpoint_fn)
 
-    trainer = CapsIQLTrainer(model,
+    trainer = CapsSACTrainer(model,
                          env,
                          logger=logger,
                          actor_lr=args.actor_lr,
-                         q_lr=args.q_lr,
-                         value_lr=args.value_lr,
-                         max_steps=args.max_steps,
+                         critic_lr=args.critic_lr,
+                         alpha_lr=args.alpha_lr,
                          reward_scale=args.reward_scale,
                          cost_scale=args.cost_scale,
                          device=args.device)
@@ -139,12 +150,11 @@ def train(args: CapsIQLTrainConfig):
             b.to(args.device) for b in batch
         ]
         trainer.train_one_step(observations, next_observations, actions, rewards, costs,
-                               done, step)
-
+                               done)
         # evaluation
-        if (step + 1) % args.eval_every == 0 or step == args.update_steps - 1:            
+        if (step + 1) % args.eval_every == 0 or step == args.update_steps - 1:
             for c_lim in cost_limits:
-                agent_perf, _, _ = trainer.evaluate_head_switch(c_lim, args.eval_episodes)
+                agent_perf = trainer.evaluate_switch(c_lim, args.eval_episodes)
                 agent_ret, agent_cost, agent_length = agent_perf
                 logger.store(tab=f"switch_{c_lim}", Cost=agent_cost, Reward=agent_ret, Length=agent_length)
 
@@ -154,8 +164,7 @@ def train(args: CapsIQLTrainConfig):
             logger.write(step, display=False)
         else:
             logger.write_without_reset(step)
-
+           
 
 if __name__ == "__main__":
     train()
-    #python train/train_capsiql.py --task OfflineHalfCheetahVelocityGymnasium-v1 --beta_cost 5 --iql_tau 0.7 --num_heads 5 --seed 20
