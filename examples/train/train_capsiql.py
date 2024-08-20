@@ -31,6 +31,8 @@ def train(args: CapsIQLTrainConfig):
     default_cfg = asdict(CapsIQL_DEFAULT_CONFIG[args.task]())
     if args.name is None:
         args.name = auto_name(default_cfg, cfg, args.prefix, args.suffix)
+    if args.group is None:
+        args.group = args.task 
     if args.logdir is not None:
         args.logdir += f"_{args.num_heads}"
         args.logdir = os.path.join(args.logdir, args.group, args.name)
@@ -57,7 +59,6 @@ def train(args: CapsIQLTrainConfig):
 
     # pre-process offline dataset
     data = env.get_dataset()
-    env.set_target_cost(args.cost_limit)
 
     cbins, rbins, max_npb, min_npb = None, None, None, None
     if args.density != 1.0:
@@ -142,7 +143,7 @@ def train(args: CapsIQLTrainConfig):
         # evaluation
         if (step + 1) % args.eval_every == 0 or step == args.update_steps - 1:            
             for c_lim in cost_limits:
-                agent_perf, _, _ = trainer.evaluate_head_switch(c_lim, args.eval_episodes)
+                agent_perf = trainer.evaluate_switch(c_lim, args.eval_episodes)
                 agent_ret, agent_cost, agent_length = agent_perf
                 logger.store(tab=f"switch_{c_lim}", Cost=agent_cost, Reward=agent_ret, Length=agent_length)
 

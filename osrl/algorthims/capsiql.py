@@ -263,7 +263,7 @@ class CapsIQLTrainer:
         
         return agent_performance
     
-    def evaluate_head_switch(self, cost_limit, eval_episodes):
+    def evaluate_switch(self, cost_limit, eval_episodes):
         """
         Evaluates the performance of switching on a number of episodes.
         """

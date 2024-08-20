@@ -24,7 +24,7 @@ class CapsSACTrainConfig:
     task: str = "OfflineCarCircle-v0"
     dataset: str = None
     seed: int = 0
-    device: str = "cuda"
+    device: str = "cuda:0"
     threads: int = 4
     reward_scale: float = 0.1
     cost_scale: float = 1
@@ -53,7 +53,7 @@ class CapsSACTrainConfig:
     num_qc: int = 2
     # evaluation params
     eval_episodes: int = 10
-    eval_every: int = 25000
+    eval_every: int = 2500
 
 
 @dataclass

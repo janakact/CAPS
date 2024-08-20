@@ -16,7 +16,7 @@ from fsrl.utils import WandbLogger
 from torch.utils.data import DataLoader
 from tqdm.auto import trange  # noqa
 
-from examples.configs.caps_configs import CapsSAC_DEFAULT_CONFIG, CapsSACTrainConfig
+from examples.configs.capssac_configs import CapsSAC_DEFAULT_CONFIG, CapsSACTrainConfig
 from osrl.algorithms import CapsSAC, CapsSACTrainer
 from osrl.common import TransitionDataset
 from osrl.common.exp_util import auto_name, seed_all
@@ -36,7 +36,7 @@ def train(args: CapsSACTrainConfig):
     if args.name is None:
         args.name = auto_name(default_cfg, cfg, args.prefix, args.suffix)
     if args.group is None:
-        args.group = args.task + "-cost-" + str(int(args.cost_limit))
+        args.group = args.task
     if args.logdir is not None:
         args.logdir += f"_{args.num_heads}"
         args.logdir = os.path.join(args.logdir, args.group, args.name)
@@ -62,7 +62,6 @@ def train(args: CapsSACTrainConfig):
 
     # pre-process offline dataset
     data = env.get_dataset()
-    env.set_target_cost(args.cost_limit)
 
     cbins, rbins, max_npb, min_npb = None, None, None, None
     if args.density != 1.0:
@@ -98,7 +97,6 @@ def train(args: CapsSACTrainConfig):
         max_action=env.action_space.high[0],
         a_hidden_sizes=args.a_hidden_sizes,
         c_hidden_sizes=args.c_hidden_sizes,
-        sample_action_num=args.sample_action_num,
         init_temperature=args.init_temperature,
         alphas_betas=args.alphas_betas,
         actor_betas=args.alphas_betas,
@@ -110,7 +108,6 @@ def train(args: CapsSACTrainConfig):
         num_heads=args.num_heads,
         num_q=args.num_q,
         num_qc=args.num_qc,
-        scalarization_step=args.scalarization_step,
         episode_len=args.episode_len,
         device=args.device,
     )

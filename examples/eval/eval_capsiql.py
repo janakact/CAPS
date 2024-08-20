@@ -16,6 +16,7 @@ from osrl.common.exp_util import load_config_and_model, seed_all
 class EvalConfig:
     path: str = "log/.../checkpoint/model.pt"
     noise_scale: List[float] = None
+    cost_limit: int = 20
     eval_episodes: int = 20
     best: bool = False
     device: str = "cpu"
@@ -25,7 +26,7 @@ class EvalConfig:
 @pyrallis.wrap()
 def eval(args: EvalConfig):
 
-    cfg, model = load_config_and_model(args.path, args.best)
+    cfg, model_ckpt = load_config_and_model(args.path, args.device, args.best)
     seed_all(cfg["seed"])
     if args.device == "cpu":
         torch.set_num_threads(args.threads)
@@ -40,7 +41,7 @@ def eval(args: EvalConfig):
         reward_scale=cfg["reward_scale"],
     )
     env = OfflineEnvWrapper(env)
-    env.set_target_cost(cfg["cost_limit"])
+    env.set_target_cost(args.cost_limit)
 
     model = CapsIQL(
         state_dim=env.observation_space.shape[0],
@@ -58,16 +59,16 @@ def eval(args: EvalConfig):
         episode_len=cfg["episode_len"],
         device=args.device,
     )
-    model.load_state_dict(model["model_state"])
+    model.load_state_dict(model_ckpt["model_state"])
     model.to(args.device)
 
     trainer = CapsIQLTrainer(model,
                          env,
-                         reward_scale=args.reward_scale,
-                         cost_scale=args.cost_scale,
+                         reward_scale=cfg["reward_scale"],
+                         cost_scale=cfg["cost_scale"],
                          device=args.device)
 
-    agent_perf = trainer.evaluate_switch(args.eval_episodes)
+    agent_perf = trainer.evaluate_switch(args.cost_limit, args.eval_episodes)
     # reward returns, cost returns, episode length
     reward_ret, reward_cost, reward_length = agent_perf
     reward_normalized_ret, reward_normalized_cost = env.get_normalized_score(reward_ret, reward_cost)
