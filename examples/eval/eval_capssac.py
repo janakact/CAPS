@@ -26,7 +26,7 @@ class EvalConfig:
 @pyrallis.wrap()
 def eval(args: EvalConfig):
 
-    cfg, model_ckpt = load_config_and_model(args.path, args.device, args.best)
+    cfg, model_ckpt = load_config_and_model(args.path, args.best)
     seed_all(cfg["seed"])
     if args.device == "cpu":
         torch.set_num_threads(args.threads)
