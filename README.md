@@ -33,7 +33,7 @@ You can also execute a sequence of experiments or run them in parallel using the
 To evaluate a trained agent, such as a `CAPS IQL` agent, use the following command:
 
 ```bash
-python examples/eval/eval_capsiql.py --path path_to_model --eval_episodes 20
+python examples/eval/eval_capsiql.py --path path_to_model --cost_limit 20 --eval_episodes 20
 ```
 
 - This command will load the configuration from `path_to_model/config.yaml` and the model from `path_to_model/checkpoints/model.pt`.
