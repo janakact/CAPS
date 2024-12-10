@@ -1,6 +1,6 @@
 # Constraint-Adaptive Policy Switching (CAPS) for Offline Safe Reinforcement Learning
 
-This repository contains the implementation of Constraint-Adaptive Policy Switching (CAPS) for Offline Safe Reinforcement Learning (RL) AAAI 2025. The structure and setup of this repository follow closely with the [OSRL repository](https://github.com/liuzuxin/OSRL).
+This repository contains the implementation of Constraint-Adaptive Policy Switching (CAPS) for Offline Safe Reinforcement Learning (RL) (AAAI 2025). The structure and setup of this repository follow closely with the [OSRL repository](https://github.com/liuzuxin/OSRL).
 
 ## Setup Instructions
 
